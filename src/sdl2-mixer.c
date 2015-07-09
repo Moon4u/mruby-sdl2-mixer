@@ -182,6 +182,7 @@ mrb_sdl2_mixer_music_initialize(mrb_state *mrb, mrb_value self)
       rwops = mrb_sdl2_rwops_get_ptr(mrb, obj);
       music = Mix_LoadMUS_RW(rwops, 0);
     } else {
+      mrb_free(mrb, data);
       mrb_raise(mrb, E_RUNTIME_ERROR, "unexpected type.");
     }
   } else if (2 == mrb->c->ci->argc) {
@@ -226,7 +227,7 @@ mrb_sdl2_mixer_open(mrb_state *mrb, mrb_value self)
 	mrb_get_args(mrb, "iiii", &freq, &format, &channels, &chunksize);
 
 	result = Mix_OpenAudio((int) freq, (Uint16) format, (int) channels, (int) chunksize);
-	return (result == 0) ? mrb_false_value() : mrb_true_value();
+	return (result == -1) ? mrb_false_value() : mrb_true_value();
 }
 
 static mrb_value
@@ -648,6 +649,21 @@ mrb_sdl2_mixer_close_audio(mrb_state *mrb, mrb_value self)
   return mrb_nil_value();
 }
 
+static mrb_value
+mrb_sdl2_mixer_init(mrb_state *mrb, mrb_value self)
+{
+  mrb_int v;
+  mrb_get_args(mrb, "i", &v);
+  return mrb_fixnum_value(Mix_Init(v));
+}
+
+static mrb_value
+mrb_sdl2_mixer_quit(mrb_state *mrb, mrb_value self)
+{
+  Mix_Quit();
+  return mrb_nil_value();
+}
+
 void
 mrb_mruby_sdl2_mixer_gem_init(mrb_state *mrb)
 {
@@ -659,6 +675,8 @@ mrb_mruby_sdl2_mixer_gem_init(mrb_state *mrb)
   MRB_SET_INSTANCE_TT(class_Chunk, MRB_TT_DATA);
   MRB_SET_INSTANCE_TT(class_Music, MRB_TT_DATA);
 	
+  mrb_define_module_function(mrb, mod_Mixer, "init",                  mrb_sdl2_mixer_init,                ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "quit",                  mrb_sdl2_mixer_quit,                ARGS_NONE());
 	mrb_define_module_function(mrb, mod_Mixer, "open",                  mrb_sdl2_mixer_open,                ARGS_REQ(4));
 	mrb_define_module_function(mrb, mod_Mixer, "allocateChannels",      mrb_sdl2_mixer_allocate_channels,   ARGS_REQ(1));
   mrb_define_module_function(mrb, mod_Mixer, "querySpec",             mrb_sdl2_mixer_query_spec,          ARGS_NONE());
@@ -722,6 +740,14 @@ mrb_mruby_sdl2_mixer_gem_init(mrb_state *mrb)
 
 
   arena_size = mrb_gc_arena_save(mrb);
+  mrb_define_const(mrb, mod_Mixer, "MIX_CHANNELS",          mrb_fixnum_value(MIX_CHANNELS));
+  mrb_define_const(mrb, mod_Mixer, "MIX_DEFAULT_FREQUENCY", mrb_fixnum_value(MIX_DEFAULT_FREQUENCY));
+  mrb_define_const(mrb, mod_Mixer, "MIX_DEFAULT_FORMAT",    mrb_fixnum_value(MIX_DEFAULT_FORMAT));
+  mrb_define_const(mrb, mod_Mixer, "MIX_DEFAULT_CHANNELS",  mrb_fixnum_value(MIX_DEFAULT_CHANNELS));
+  mrb_define_const(mrb, mod_Mixer, "MIX_MAX_VOLUME",        mrb_fixnum_value(MIX_MAX_VOLUME));
+  mrb_gc_arena_restore(mrb, arena_size);
+
+  arena_size = mrb_gc_arena_save(mrb);
   mrb_define_const(mrb, mod_Mixer, "MIX_NO_FADING",  mrb_fixnum_value(MIX_NO_FADING));
   mrb_define_const(mrb, mod_Mixer, "MIX_FADING_OUT", mrb_fixnum_value(MIX_FADING_OUT));
   mrb_define_const(mrb, mod_Mixer, "MIX_FADING_IN",  mrb_fixnum_value(MIX_FADING_IN));
@@ -738,6 +764,15 @@ mrb_mruby_sdl2_mixer_gem_init(mrb_state *mrb)
   mrb_define_const(mrb, mod_Mixer, "MUS_MP3_MAD",  mrb_fixnum_value(MUS_MP3_MAD));
   mrb_define_const(mrb, mod_Mixer, "MUS_FLAC",     mrb_fixnum_value(MUS_FLAC));
   mrb_define_const(mrb, mod_Mixer, "MUS_MODPLUG",  mrb_fixnum_value(MUS_MODPLUG));
+  mrb_gc_arena_restore(mrb, arena_size);
+
+  arena_size = mrb_gc_arena_save(mrb);
+  mrb_define_const(mrb, mod_Mixer, "MIX_INIT_FLAC",       mrb_fixnum_value(MIX_INIT_FLAC));
+  mrb_define_const(mrb, mod_Mixer, "MIX_INIT_MOD",        mrb_fixnum_value(MIX_INIT_MOD));
+  mrb_define_const(mrb, mod_Mixer, "MIX_INIT_MODPLUG",    mrb_fixnum_value(MIX_INIT_MODPLUG));
+  mrb_define_const(mrb, mod_Mixer, "MIX_INIT_MP3",        mrb_fixnum_value(MIX_INIT_MP3));
+  mrb_define_const(mrb, mod_Mixer, "MIX_INIT_OGG",        mrb_fixnum_value(MIX_INIT_OGG));
+  mrb_define_const(mrb, mod_Mixer, "MIX_INIT_FLUIDSYNTH", mrb_fixnum_value(MIX_INIT_FLUIDSYNTH));
   mrb_gc_arena_restore(mrb, arena_size);
 }
 
