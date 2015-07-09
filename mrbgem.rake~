@@ -1,8 +1,0 @@
-MRuby::Gem::Specification.new('mruby-sdl2') do |spec|
-  spec.license = 'MIT'
-  spec.authors = 'Moon4u'
-
-  spec.cc.flags << '`sdl2-config --cflags`'
-  spec.cc.flags << '../sdl2/src/'
-  spec.linker.flags_before_libraries << '-L/usr/local/lib -Wl,-rpath,/usr/local/lib -lSDL2 -lSDL2_mixer -lpthread'
-end
