@@ -73,12 +73,17 @@ mrb_sdl2_mixer_chunk_initialize(mrb_state *mrb, mrb_value self)
     }
     data->chunk = NULL;
   }
-
+  SDL_RWops *rwops;
+  bool str = false;
   if (1 == mrb->c->ci->argc) {
-  	SDL_RWops *rwops;
-    mrb_value rw;
-    mrb_get_args(mrb, "o", &rw);
-	rwops = mrb_sdl2_rwops_get_ptr(mrb, rw);
+    mrb_value v;
+    mrb_get_args(mrb, "o", &v);
+    if (mrb_type(v) == MRB_TT_STRING) {
+      rwops = SDL_RWFromFile(RSTRING_PTR(v), "r");
+      str = true;
+    }
+    else if (mrb_type(v) == MRB_TT_OBJECT)
+      rwops = mrb_sdl2_rwops_get_ptr(mrb, v);
     chunk = Mix_LoadWAV_RW(rwops, 0);
   } else {
     mrb_free(mrb, data);
@@ -86,8 +91,12 @@ mrb_sdl2_mixer_chunk_initialize(mrb_state *mrb, mrb_value self)
   }
   if (NULL == chunk) {
     mrb_free(mrb, data);
+    if (str)
+      SDL_FreeRW(rwops);
     mruby_sdl2_raise_error(mrb);
   }
+  if (str)
+    SDL_FreeRW(rwops);
 
   data->chunk = chunk;
 
@@ -235,7 +244,7 @@ mrb_sdl2_mixer_allocate_channels(mrb_state *mrb, mrb_value self)
 {
 	int result;
 	mrb_int numchans;
-	mrb_get_args(mrb, "iiii", &numchans);
+	mrb_get_args(mrb, "i", &numchans);
 
 	result = Mix_AllocateChannels((int) numchans);
 	return mrb_fixnum_value(result);
@@ -394,9 +403,12 @@ mrb_sdl2_mixer_music_play(mrb_state *mrb, mrb_value self)
 {
   Mix_Music *c;
   mrb_int loops;
+  int result;
   mrb_get_args(mrb, "i", &loops);
   c = mrb_sdl2_music_get_ptr(mrb, self);
-  return mrb_fixnum_value(Mix_PlayMusic(c, loops));
+  if ((result = Mix_PlayMusic(c, loops)) == -1) 
+    mruby_sdl2_raise_error(mrb);
+  return mrb_fixnum_value(result);
 }
 
 static mrb_value
@@ -674,69 +686,69 @@ mrb_mruby_sdl2_mixer_gem_init(mrb_state *mrb)
 
   MRB_SET_INSTANCE_TT(class_Chunk, MRB_TT_DATA);
   MRB_SET_INSTANCE_TT(class_Music, MRB_TT_DATA);
-	
-  mrb_define_module_function(mrb, mod_Mixer, "init",                  mrb_sdl2_mixer_init,                ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "quit",                  mrb_sdl2_mixer_quit,                ARGS_NONE());
-	mrb_define_module_function(mrb, mod_Mixer, "open",                  mrb_sdl2_mixer_open,                ARGS_REQ(4));
-	mrb_define_module_function(mrb, mod_Mixer, "allocateChannels",      mrb_sdl2_mixer_allocate_channels,   ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "querySpec",             mrb_sdl2_mixer_query_spec,          ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "get_num_chuck_decoder", mrb_sdl2_mixer_GetNumChunkDecoders, ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "get_chunk_decoder",     mrb_sdl2_mixer_GetChunkDecoder,     ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "get_num_music_decoder", mrb_sdl2_mixer_GetNumMusicDecoders, ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "get_music_decoder",     mrb_sdl2_mixer_GetMusicDecoder,     ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "set_panning",           mrb_sdl2_mixer_set_panning,         ARGS_REQ(3));
-  mrb_define_module_function(mrb, mod_Mixer, "set_position",          mrb_sdl2_mixer_set_position,        ARGS_REQ(3));
-  mrb_define_module_function(mrb, mod_Mixer, "set_distance",          mrb_sdl2_mixer_set_distance,        ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "set_reverse_stereo",    mrb_sdl2_mixer_set_reverse_stereo,  ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "reverse_channel",       mrb_sdl2_mixer_reverse_channel,     ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "group_channel",         mrb_sdl2_mixer_group_channel,       ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "group_channels",        mrb_sdl2_mixer_group_channels,      ARGS_REQ(3));
-  mrb_define_module_function(mrb, mod_Mixer, "group_count",           mrb_sdl2_mixer_group_count,         ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "group_oldest",          mrb_sdl2_mixer_group_oldest,        ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "group_newer",           mrb_sdl2_mixer_group_newer,         ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "volume",                mrb_sdl2_mixer_volume,              ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "music_volume",          mrb_sdl2_mixer_music_volume,        ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "halt_channel",          mrb_sdl2_mixer_halt_channel,        ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "halt_group",            mrb_sdl2_mixer_halt_group,          ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "halt_music",            mrb_sdl2_mixer_halt_music,          ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "expire_channel",        mrb_sdl2_mixer_expire_channel,      ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "fade_out_channel",      mrb_sdl2_mixer_fade_out_channel,    ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "fade_out_group",        mrb_sdl2_mixer_fade_out_group,      ARGS_REQ(2));
-  mrb_define_module_function(mrb, mod_Mixer, "fade_out_music",        mrb_sdl2_mixer_fade_out_music,      ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "fading_music",          mrb_sdl2_mixer_fading_music,        ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "fading_channel",        mrb_sdl2_mixer_fading_channel,      ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "pause_channel",         mrb_sdl2_mixer_pause_channel,       ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "resume_channel",        mrb_sdl2_mixer_resume_channel,      ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "paused_channel",        mrb_sdl2_mixer_paused_channel,      ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "pause_music",           mrb_sdl2_mixer_pause_music,         ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "resume_music",          mrb_sdl2_mixer_resume_music,        ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "rewind_music",          mrb_sdl2_mixer_rewind_music,        ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "paused_music",          mrb_sdl2_mixer_paused_music,        ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "set_music_position",    mrb_sdl2_mixer_set_music_position,  ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "channel_playing?",      mrb_sdl2_mixer_channel_playing,     ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "music_playing?",        mrb_sdl2_mixer_music_playing,       ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "set_music_cmd",         mrb_sdl2_mixer_set_music_cmd,       ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "set_sync_value",        mrb_sdl2_mixer_set_sync_value,      ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "get_sync_value",        mrb_sdl2_mixer_get_sync_value,      ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "set_sound_fonts",       mrb_sdl2_mixer_set_sound_fonts,     ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "get_sound_fonts",       mrb_sdl2_mixer_get_sound_fonts,     ARGS_NONE());
-  mrb_define_module_function(mrb, mod_Mixer, "get_channel_chunk",     mrb_sdl2_mixer_get_channel_chunk,   ARGS_REQ(1));
-  mrb_define_module_function(mrb, mod_Mixer, "close_audio",           mrb_sdl2_mixer_close_audio,         ARGS_NONE());
 
-	mrb_define_method(mrb, class_Chunk, "initialize",    mrb_sdl2_mixer_chunk_initialize,    ARGS_REQ(1));
-	mrb_define_method(mrb, class_Chunk, "free",          mrb_sdl2_mixer_chunk_free,          ARGS_NONE());
-  mrb_define_method(mrb, class_Chunk, "destroy",       mrb_sdl2_mixer_chunk_free,          ARGS_NONE());
-  mrb_define_method(mrb, class_Chunk, "play",          mrb_sdl2_mixer_chunk_play,          ARGS_REQ(2) | ARGS_OPT(1));
-  mrb_define_method(mrb, class_Chunk, "fade_in_timed", mrb_sdl2_mixer_music_fade_in_timed, ARGS_REQ(4));
-  mrb_define_method(mrb, class_Chunk, "volume",        mrb_sdl2_mixer_chunk_volume,        ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "init",                  mrb_sdl2_mixer_init,                MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "quit",                  mrb_sdl2_mixer_quit,                MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "open",                  mrb_sdl2_mixer_open,                MRB_ARGS_REQ(4));
+  mrb_define_module_function(mrb, mod_Mixer, "allocate_channels",      mrb_sdl2_mixer_allocate_channels,   MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "querySpec",             mrb_sdl2_mixer_query_spec,          MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "get_num_chuck_decoder", mrb_sdl2_mixer_GetNumChunkDecoders, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "get_chunk_decoder",     mrb_sdl2_mixer_GetChunkDecoder,     MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "get_num_music_decoder", mrb_sdl2_mixer_GetNumMusicDecoders, MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "get_music_decoder",     mrb_sdl2_mixer_GetMusicDecoder,     MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "set_panning",           mrb_sdl2_mixer_set_panning,         MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, mod_Mixer, "set_position",          mrb_sdl2_mixer_set_position,        MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, mod_Mixer, "set_distance",          mrb_sdl2_mixer_set_distance,        MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "set_reverse_stereo",    mrb_sdl2_mixer_set_reverse_stereo,  MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "reverse_channel",       mrb_sdl2_mixer_reverse_channel,     MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "group_channel",         mrb_sdl2_mixer_group_channel,       MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "group_channels",        mrb_sdl2_mixer_group_channels,      MRB_ARGS_REQ(3));
+  mrb_define_module_function(mrb, mod_Mixer, "group_count",           mrb_sdl2_mixer_group_count,         MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "group_oldest",          mrb_sdl2_mixer_group_oldest,        MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "group_newer",           mrb_sdl2_mixer_group_newer,         MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "volume",                mrb_sdl2_mixer_volume,              MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "music_volume",          mrb_sdl2_mixer_music_volume,        MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "halt_channel",          mrb_sdl2_mixer_halt_channel,        MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "halt_group",            mrb_sdl2_mixer_halt_group,          MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "halt_music",            mrb_sdl2_mixer_halt_music,          MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "expire_channel",        mrb_sdl2_mixer_expire_channel,      MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "fade_out_channel",      mrb_sdl2_mixer_fade_out_channel,    MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "fade_out_group",        mrb_sdl2_mixer_fade_out_group,      MRB_ARGS_REQ(2));
+  mrb_define_module_function(mrb, mod_Mixer, "fade_out_music",        mrb_sdl2_mixer_fade_out_music,      MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "fading_music",          mrb_sdl2_mixer_fading_music,        MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "fading_channel",        mrb_sdl2_mixer_fading_channel,      MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "pause_channel",         mrb_sdl2_mixer_pause_channel,       MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "resume_channel",        mrb_sdl2_mixer_resume_channel,      MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "paused_channel",        mrb_sdl2_mixer_paused_channel,      MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "pause_music",           mrb_sdl2_mixer_pause_music,         MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "resume_music",          mrb_sdl2_mixer_resume_music,        MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "rewind_music",          mrb_sdl2_mixer_rewind_music,        MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "paused_music",          mrb_sdl2_mixer_paused_music,        MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "set_music_position",    mrb_sdl2_mixer_set_music_position,  MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "channel_playing?",      mrb_sdl2_mixer_channel_playing,     MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "music_playing?",        mrb_sdl2_mixer_music_playing,       MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "set_music_cmd",         mrb_sdl2_mixer_set_music_cmd,       MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "set_sync_value",        mrb_sdl2_mixer_set_sync_value,      MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "get_sync_value",        mrb_sdl2_mixer_get_sync_value,      MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "set_sound_fonts",       mrb_sdl2_mixer_set_sound_fonts,     MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "get_sound_fonts",       mrb_sdl2_mixer_get_sound_fonts,     MRB_ARGS_NONE());
+  mrb_define_module_function(mrb, mod_Mixer, "get_channel_chunk",     mrb_sdl2_mixer_get_channel_chunk,   MRB_ARGS_REQ(1));
+  mrb_define_module_function(mrb, mod_Mixer, "close_audio",           mrb_sdl2_mixer_close_audio,         MRB_ARGS_NONE());
 
-  mrb_define_method(mrb, class_Music, "initialize",  mrb_sdl2_mixer_music_initialize,  ARGS_REQ(1) | ARGS_REQ(2));
-  mrb_define_method(mrb, class_Music, "free",        mrb_sdl2_mixer_music_free,        ARGS_NONE());
-  mrb_define_method(mrb, class_Music, "destroy",     mrb_sdl2_mixer_music_free,        ARGS_NONE());
-  mrb_define_method(mrb, class_Music, "type",        mrb_sdl2_mixer_music_get_type,    ARGS_NONE());
-  mrb_define_method(mrb, class_Music, "play",        mrb_sdl2_mixer_music_play,        ARGS_REQ(1));
-  mrb_define_method(mrb, class_Music, "fade_in",     mrb_sdl2_mixer_music_fade_in,     ARGS_REQ(2));
-  mrb_define_method(mrb, class_Music, "fade_in_pos", mrb_sdl2_mixer_music_fade_in_pos, ARGS_REQ(2));
+  mrb_define_method(mrb, class_Chunk, "initialize",    mrb_sdl2_mixer_chunk_initialize,    MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, class_Chunk, "free",          mrb_sdl2_mixer_chunk_free,          MRB_ARGS_NONE());
+  mrb_define_method(mrb, class_Chunk, "destroy",       mrb_sdl2_mixer_chunk_free,          MRB_ARGS_NONE());
+  mrb_define_method(mrb, class_Chunk, "play",          mrb_sdl2_mixer_chunk_play,          MRB_ARGS_REQ(2) | MRB_ARGS_OPT(1));
+  mrb_define_method(mrb, class_Chunk, "fade_in_timed", mrb_sdl2_mixer_music_fade_in_timed, MRB_ARGS_REQ(4));
+  mrb_define_method(mrb, class_Chunk, "volume=",       mrb_sdl2_mixer_chunk_volume,        MRB_ARGS_REQ(1));
+
+  mrb_define_method(mrb, class_Music, "initialize",  mrb_sdl2_mixer_music_initialize,  MRB_ARGS_REQ(1) | MRB_ARGS_REQ(2));
+  mrb_define_method(mrb, class_Music, "free",        mrb_sdl2_mixer_music_free,        MRB_ARGS_NONE());
+  mrb_define_method(mrb, class_Music, "destroy",     mrb_sdl2_mixer_music_free,        MRB_ARGS_NONE());
+  mrb_define_method(mrb, class_Music, "type",        mrb_sdl2_mixer_music_get_type,    MRB_ARGS_NONE());
+  mrb_define_method(mrb, class_Music, "play",        mrb_sdl2_mixer_music_play,        MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, class_Music, "fade_in",     mrb_sdl2_mixer_music_fade_in,     MRB_ARGS_REQ(2));
+  mrb_define_method(mrb, class_Music, "fade_in_pos", mrb_sdl2_mixer_music_fade_in_pos, MRB_ARGS_REQ(2));
 
 
   arena_size = mrb_gc_arena_save(mrb);
